@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+*.mp3
+*.wav
+.vercel/
+api/dist/
+api/grammarLibraryData.ts
+api/minimal.ts

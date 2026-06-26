@@ -5,10 +5,8 @@
 
 import express from "express";
 import path from "path";
-import { createServer as createViteServer } from "vite";
 import Groq from "groq-sdk";
 import dotenv from "dotenv";
-import { getAudioUrl } from "google-tts-api";
 import { GRAMMAR_LIBRARY } from "./src/components/tools/grammarLibraryData";
 
 dotenv.config();
@@ -328,22 +326,18 @@ app.post("/api/grammar/verify", async (req, res) => {
 
 // Google TTS gratuito — sin API key, sin config, funciona en Vercel
 app.post("/api/tts", async (req, res) => {
-  const { text, gender } = req.body;
+  const { text } = req.body;
   if (!text) return res.status(400).json({ error: "Text is required" });
 
   try {
-    const url = getAudioUrl(text, {
-      lang: "en",
-      slow: false,
-      host: "https://translate.google.com",
-    });
+    const q = encodeURIComponent(text.slice(0, 200));
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${q}&tl=en&total=1&idx=0&textlen=${text.length}&client=tw-ob&prev=input&ttsspeed=1`;
 
     const response = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0" },
     });
     if (!response.ok) {
-      const errText = await response.text().catch(() => "");
-      console.error("[TTS] Google TTS error:", response.status, errText.slice(0, 200));
+      console.error("[TTS] Google TTS error:", response.status);
       return res.status(502).json({ error: "TTS upstream failed" });
     }
 
@@ -363,7 +357,7 @@ export default app;
 if (!process.env.VERCEL) {
   async function setupServer() {
     if (process.env.NODE_ENV !== "production") {
-      const vite = await createViteServer({
+      const vite = await (await import("vite")).createServer({
         server: { middlewareMode: true },
         appType: "spa",
       });
@@ -371,7 +365,7 @@ if (!process.env.VERCEL) {
     } else {
       const distPath = path.join(process.cwd(), "dist");
       app.use(express.static(distPath));
-      app.get("*all", (req, res) => {
+      app.get("*", (req, res) => {
         res.sendFile(path.join(distPath, "index.html"));
       });
     }
