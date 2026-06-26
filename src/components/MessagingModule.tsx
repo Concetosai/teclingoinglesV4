@@ -1,0 +1,486 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import { useState, useMemo, useEffect } from 'react';
+import { 
+  MessageSquare, 
+  Search, 
+  Send, 
+  Paperclip, 
+  MoreVertical,
+  Users,
+  GraduationCap,
+  ShieldCheck,
+  Check,
+  Image as ImageIcon,
+  Eye,
+  Star,
+  BrainCircuit,
+  Zap,
+  Mic,
+  Languages,
+  Sparkles,
+  Info,
+  X,
+  Volume2,
+  Crown,
+  ArrowLeft
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { useAppContext, ChatThread, Message as AppMessage } from '../context/AppContext';
+import { UserHierarchyModal, User } from './UsersMaster';
+
+// Helper to convert Chat to User for the modal
+export const chatToUser = (chat: ChatThread): User => ({
+  id: chat.id,
+  controlNumber: 'TEC-2024-' + chat.id.slice(-3),
+  curp: 'XXXX000000XXXXXX00',
+  name: chat.name,
+  email: chat.name.toLowerCase().replace(' ', '.') + '@tecnolingo.ai',
+  phone: '+52 833 000 0000',
+  location: 'Campus General',
+  role: chat.type === 'GLOBAL' ? 'ADMIN' : (chat.type === 'GROUP' ? 'ALUMNO' : 'DOCENTE'),
+  status: 'ACTIVE',
+  joinDate: '01 ENE 2024',
+  photo: 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?w=150&h=150&fit=crop',
+});
+
+export function MessagingModule({ initialChatId, initialPrefilledText }: { initialChatId?: string; initialPrefilledText?: string }) {
+  const { currentRole, chats, addMessage, setQuickChatUser } = useAppContext();
+  const [selectedChatId, setSelectedChatId] = useState<string>(chats[0]?.id || '');
+  const [search, setSearch] = useState('');
+  const [inputText, setInputText] = useState('');
+  const [showADNPin, setShowADNPin] = useState(false);
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
+  const [aiSuggestion, setAiSuggestion] = useState<string | null>(null);
+  const [showDossier, setShowDossier] = useState(false);
+  const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+  const [broadcastText, setBroadcastText] = useState('');
+  const [mobileView, setMobileView] = useState<'list' | 'chat'>('list');
+
+  useEffect(() => {
+    if (initialChatId) {
+      setSelectedChatId(initialChatId);
+      setMobileView('chat');
+    }
+    if (initialPrefilledText) {
+      setInputText(initialPrefilledText);
+    }
+  }, [initialChatId, initialPrefilledText]);
+
+  const filteredChats = useMemo(() => {
+    return chats.filter(chat => {
+      const matchesSearch = chat.name.toLowerCase().includes(search.toLowerCase());
+      
+      // Basic role filtering for demo purposes
+      // In a real app, participants logic would handle this
+      if (currentRole === 'ALUMNO') {
+         return matchesSearch && (chat.type === 'GROUP' || chat.type === 'GLOBAL' || chat.type === 'DIRECT');
+      }
+      return matchesSearch;
+    });
+  }, [chats, currentRole, search]);
+
+  const selectedChat = chats.find(c => c.id === selectedChatId) || filteredChats[0];
+
+  const handleSendMessage = () => {
+    if (!inputText || !selectedChat) return;
+
+    const newMessage: AppMessage = {
+      id: Date.now().toString(),
+      senderId: 'ME', // Should be the actual user ID
+      senderName: currentRole === 'DIRECTOR' ? 'Dirección' : 'Usuario',
+      senderRole: currentRole,
+      content: inputText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isDirector: currentRole === 'DIRECTOR'
+    };
+
+    addMessage(selectedChat.id, newMessage);
+    setInputText('');
+  };
+
+  const handleBroadcast = () => {
+    if (!broadcastText) return;
+    
+    // Broadcast to GLOBAL chat
+    const broadcastMsg: AppMessage = {
+      id: Date.now().toString(),
+      senderId: 'DIR-001',
+      senderName: 'Dirección General',
+      senderRole: 'DIRECTOR',
+      content: broadcastText,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isDirector: true
+    };
+
+    addMessage('CHAT-GLOBAL', broadcastMsg);
+    setBroadcastText('');
+    setShowBroadcastModal(false);
+  };
+
+  const handleAISuggest = () => {
+    if (!inputText) return;
+    setAiSuggestion(`Sugerencia IA: "Hi team! I've published the new administrative updates. Please confirm once you've read them."`);
+    setShowAIAssistant(true);
+  };
+
+  const applyAISuggestion = () => {
+    if (aiSuggestion) {
+      setInputText(aiSuggestion.split('"')[1]);
+      setAiSuggestion(null);
+      setShowAIAssistant(false);
+    }
+  };
+
+  return (
+    <div className="h-[calc(100vh-140px)] md:h-[calc(100vh-200px)] grid grid-cols-12 gap-4 lg:gap-8 pb-12 animate-in fade-in duration-700">
+      {/* Sidebar: Red de Apoyo List */}
+      <div className={`col-span-12 lg:col-span-4 flex flex-col gap-4 lg:gap-6 h-full ${mobileView === 'chat' ? 'hidden lg:flex' : 'flex'}`}>
+         <div className="space-y-6">
+            <header className="flex items-center justify-between">
+               <div>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-1.5 h-1.5 rounded-full bg-[#DEFF9A] shadow-[0_0_8px_#DEFF9A]" />
+                    <h2 className="text-[#DEFF9A] text-[10px] font-black uppercase tracking-[0.4em]">Sincronización Real-Time</h2>
+                  </div>
+                  <h1 className="text-3xl font-black text-white bevel-text uppercase tracking-tight">Red de Apoyo</h1>
+               </div>
+               
+               {currentRole === 'DIRECTOR' && (
+                 <button 
+                  onClick={() => setShowBroadcastModal(true)}
+                  className="p-3 bg-[#DEFF9A] text-black rounded-2xl shadow-[0_0_20px_rgba(222,255,154,0.4)] hover:scale-105 transition-all"
+                  title="Broadcast Institucional"
+                 >
+                    <Volume2 size={20} />
+                 </button>
+               )}
+            </header>
+
+            <div className="relative group">
+               <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-white/20 group-focus-within:text-[#DEFF9A] transition-colors" size={18} />
+               <input 
+                type="text" 
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Buscar chats o grupos..."
+                className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-14 pr-6 text-white text-[11px] placeholder:text-white/10 outline-none focus:border-[#DEFF9A]/40 transition-all font-bold"
+               />
+            </div>
+         </div>
+
+         <div className="flex-1 overflow-y-auto space-y-3 pr-2 custom-scrollbar">
+            {filteredChats.map((chat) => (
+              <motion.button 
+                key={chat.id}
+                whileHover={{ x: 5 }}
+                onClick={() => {
+                   setSelectedChatId(chat.id);
+                   setMobileView('chat');
+                }}
+                className={`w-full p-4 rounded-[2rem] border text-left flex items-center gap-4 group transition-all relative overflow-hidden ${
+                  selectedChatId === chat.id 
+                  ? 'bg-[#DEFF9A]/10 border-[#DEFF9A]/20 shadow-[0_10px_30px_rgba(222,255,154,0.05)]' 
+                  : 'bg-white/[0.01] border-white/5 hover:border-white/10'
+                }`}
+              >
+                 <div className="relative">
+                    <div className="w-12 h-12 rounded-2xl border border-white/10 overflow-hidden group-hover:border-[#DEFF9A]/40 transition-all bg-black/40 flex items-center justify-center text-[#DEFF9A]">
+                       {chat.type === 'GROUP' ? <Users size={20} /> : <Crown size={20} />}
+                    </div>
+                    <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full border-2 border-[#061a1a] bg-[#4ADE80] shadow-[0_0_10px_#4ADE80]" />
+                 </div>
+
+                 <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-0.5">
+                       <h4 className="text-white text-[13px] font-black uppercase tracking-tight truncate">{chat.name}</h4>
+                       <span className="text-white/20 text-[8px] font-black">
+                          {chat.messages[chat.messages.length - 1]?.timestamp || '...'}
+                       </span>
+                    </div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${
+                        chat.type === 'GLOBAL' ? 'bg-orange-500/20 text-orange-400' :
+                        chat.type === 'GROUP' ? 'bg-[#DEFF9A]/20 text-[#DEFF9A]' :
+                        'bg-blue-500/20 text-blue-400'
+                      }`}>
+                        {chat.type} CHANNEL
+                      </span>
+                    </div>
+                    <p className={`text-[10px] truncate font-medium ${chat.unreadCount > 0 ? 'text-[#DEFF9A] font-black' : 'text-white/20'}`}>
+                       {chat.lastMessage || 'Inicia la conversación...'}
+                    </p>
+                 </div>
+
+                 {chat.unreadCount > 0 && (
+                   <div className="bg-[#DEFF9A] text-black text-[9px] font-black px-2 py-0.5 rounded-full shadow-[0_0_10px_#DEFF9A]">
+                      {chat.unreadCount}
+                   </div>
+                 )}
+              </motion.button>
+            ))}
+         </div>
+      </div>
+
+      {/* Main Window: Support Chat */}
+      <div className={`col-span-12 lg:col-span-8 h-full flex flex-col rounded-3xl lg:rounded-[3.5rem] bg-black/40 border border-white/5 overflow-hidden relative glass shadow-2xl ${mobileView === 'list' ? 'hidden lg:flex' : 'flex'}`}>
+         <div className="absolute inset-0 bg-gradient-to-b from-[#DEFF9A]/05 to-transparent pointer-events-none" />
+         
+         {selectedChat ? (
+           <>
+             <header className="p-4 sm:p-8 border-b border-white/10 flex items-center justify-between bg-white/[0.02] backdrop-blur-3xl relative z-20">
+                <div className="flex items-center gap-3 sm:gap-5">
+                   {/* Back Button on Mobile */}
+                   <button
+                     onClick={() => setMobileView('list')}
+                     className="lg:hidden p-2.5 bg-white/5 border border-white/10 hover:bg-white/10 active:scale-95 text-white rounded-xl flex items-center justify-center mr-1 transition-all"
+                     title="Volver a la lista de chats"
+                   >
+                     <ArrowLeft size={16} />
+                   </button>
+                   <div className="relative">
+                      <div className="w-14 h-14 rounded-2xl border border-[#DEFF9A]/20 overflow-hidden shadow-2xl bg-black/40 flex items-center justify-center text-[#DEFF9A]">
+                          {selectedChat.type === 'GROUP' ? <Users size={24} /> : <Crown size={24} />}
+                      </div>
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border-2 border-[#0a0c10] bg-[#4ADE80] shadow-[0_0_15px_#4ADE80]" />
+                   </div>
+                   <div>
+                      <button 
+                        className="group flex items-center gap-3 text-left"
+                        onClick={() => setShowDossier(true)}
+                      >
+                        <h3 className="text-xl font-black text-white uppercase tracking-tighter group-hover:text-[#DEFF9A] transition-colors">
+                          {selectedChat.name}
+                        </h3>
+                        <Eye size={16} className="text-white/20 group-hover:text-[#DEFF9A] transition-all" />
+                      </button>
+                      <div className="flex items-center gap-3 mt-1">
+                         <span className="text-[8px] font-black text-[#DEFF9A] uppercase tracking-widest bg-[#DEFF9A]/10 px-2.5 py-1 rounded-lg border border-[#DEFF9A]/20">
+                            CANAL {selectedChat.type}
+                         </span>
+                         <span className="text-white/30 text-[9px] font-bold uppercase tracking-widest flex items-center gap-1.5">
+                            <div className="w-1 h-1 rounded-full bg-[#4ADE80] animate-pulse" />
+                            Activo ahora
+                         </span>
+                      </div>
+                   </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                   <button className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white/30 hover:text-white transition-all shadow-xl">
+                      <MoreVertical size={20} />
+                   </button>
+                </div>
+             </header>
+
+             {/* Chat Body */}
+             <div className="flex-1 overflow-y-auto p-4 sm:p-10 space-y-4 sm:space-y-10 custom-scrollbar relative z-0">
+                {selectedChat.messages.map((msg) => (
+                  <div key={msg.id} className={`flex flex-col ${msg.senderId === 'ME' ? 'items-end' : 'items-start'} animate-in fade-in slide-in-from-bottom-2`}>
+                     <div className="flex items-center gap-3 mb-3 px-2">
+                        <span className="text-[8px] font-black text-white/20 uppercase tracking-[0.2em] leading-none">
+                           {msg.senderId === 'ME' ? `Tú (${msg.senderRole})` : `${msg.senderName} (${msg.senderRole})`}
+                        </span>
+                        {msg.isDirector && (
+                          <span className="bg-[#fbbf24]/10 text-[#fbbf24] px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest border border-[#fbbf24]/20">
+                            [DIRECTOR]
+                          </span>
+                        )}
+                        <span className="text-white/10 text-[8px] tracking-tighter">•</span>
+                        <span className="text-[8px] font-black text-white/10 uppercase tracking-widest leading-none">{msg.timestamp}</span>
+                     </div>
+                     
+                     <div className={`max-w-[90%] sm:max-w-[80%] p-3.5 sm:p-6 rounded-[1.5rem] sm:rounded-[2.5rem] text-[12px] sm:text-[13px] font-semibold leading-relaxed relative ${
+                        msg.isDirector && msg.senderId !== 'ME'
+                        ? 'bg-[#fbbf24]/10 border-2 border-[#fbbf24]/30 text-[#fbbf24] shadow-[0_0_30px_rgba(251,191,36,0.1)]'
+                        : msg.senderId === 'ME' 
+                        ? 'bg-[#DEFF9A] text-[#061a1a] rounded-tr-none shadow-[0_15px_40px_rgba(222,255,154,0.1)]' 
+                        : 'bg-white/[0.03] text-white/90 border border-white/5 rounded-tl-none backdrop-blur-3xl'
+                     }`}>
+                        {msg.isDirector && <div className="flex items-center gap-2 mb-2 text-[#fbbf24] text-[10px] font-black uppercase tracking-widest border-b border-[#fbbf24]/10 pb-2">
+                          <Crown size={12} fill="currentColor" /> MENSAJE INSTITUCIONAL
+                        </div>}
+                        {msg.content}
+                        {msg.senderId === 'ME' && (
+                          <div className="absolute bottom-4 right-6 flex items-center gap-0.5">
+                             <Check size={12} className="text-[#061a1a]/40" />
+                             <Check size={12} className="text-[#061a1a]/40 -ml-1.5" />
+                          </div>
+                        )}
+                     </div>
+                  </div>
+                ))}
+                
+                {selectedChat.messages.length === 0 && (
+                  <div className="h-full flex flex-col items-center justify-center text-center space-y-4 opacity-20">
+                     <MessageSquare size={48} />
+                     <p className="text-xs font-black uppercase tracking-widest">Sin mensajes en este canal</p>
+                  </div>
+                )}
+                <div className="h-4" />
+             </div>
+
+             {/* AI Assistant Suggestion */}
+             <AnimatePresence>
+               {showAIAssistant && aiSuggestion && (
+                 <motion.div 
+                   initial={{ y: 20, opacity: 0 }}
+                   animate={{ y: 0, opacity: 1 }}
+                   exit={{ y: 20, opacity: 0 }}
+                   className="mx-10 mb-[-2rem] p-4 bg-purple-500/10 border border-purple-500/20 rounded-2xl backdrop-blur-2xl relative z-20 flex flex-col gap-3"
+                 >
+                    <div className="flex items-center justify-between">
+                       <div className="flex items-center gap-2 text-purple-400">
+                          <Sparkles size={14} />
+                          <span className="text-[9px] font-black uppercase tracking-widest">IA SMART REPLY</span>
+                       </div>
+                       <button onClick={() => setShowAIAssistant(false)} className="text-white/20 hover:text-white">
+                          <X size={14} />
+                       </button>
+                    </div>
+                    <p className="text-white/80 text-[11px] font-medium leading-relaxed italic">{aiSuggestion}</p>
+                    <button 
+                      onClick={applyAISuggestion}
+                      className="w-full py-2 bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 text-[9px] font-black uppercase tracking-[0.2em] rounded-xl transition-all"
+                    >
+                      Aplicar Sugerencia
+                    </button>
+                 </motion.div>
+               )}
+             </AnimatePresence>
+
+             {/* Chat Input */}
+             <div className="p-3 pb-5 sm:p-10 sm:pb-12 bg-black/80 backdrop-blur-3xl border-t border-white/10 relative z-20">
+                <div className="flex items-center gap-2 sm:gap-4 bg-white/05 border border-white/10 rounded-2xl sm:rounded-[2.5rem] p-2 pl-4 sm:p-3 sm:pl-8 shadow-2xl focus-within:border-[#DEFF9A]/40 transition-all">
+                   <button className="text-white/20 hover:text-[#DEFF9A] transition-colors p-2 hidden sm:block">
+                      <Paperclip size={20} />
+                   </button>
+                   <button className="text-white/20 hover:text-[#DEFF9A] transition-colors p-2 mr-2 hidden sm:block">
+                      <Mic size={20} />
+                   </button>
+                   
+                   <form 
+                    className="flex-1 relative flex items-center"
+                    onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+                   >
+                      <input 
+                        type="text" 
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                        placeholder={currentRole === 'DIRECTOR' ? "Escribe un mensaje de autoridad..." : "Escribe un mensaje oficial..."}
+                        className="w-full bg-transparent text-white text-[12px] sm:text-[13px] font-bold outline-none placeholder:text-white/10 pr-2"
+                      />
+                      {inputText && (
+                        <button 
+                          type="button"
+                          onClick={handleAISuggest}
+                          className="absolute right-0 flex items-center gap-1 sm:gap-2 px-2 py-1 sm:px-3 sm:py-1.5 rounded-lg sm:rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-400 hover:bg-purple-500/20 transition-all scale-90"
+                        >
+                          <Sparkles size={12} className="sm:size-[14px]" />
+                          <span className="text-[7px] sm:text-[8px] font-black uppercase tracking-widest">AI Check</span>
+                        </button>
+                      )}
+                   </form>
+
+                   <button 
+                    onClick={handleSendMessage}
+                    className="w-10 h-10 sm:w-14 sm:h-14 rounded-xl sm:rounded-3xl bg-[#DEFF9A] text-[#061a1a] flex items-center justify-center shadow-[0_0_20px_#DEFF9A60] hover:shadow-[0_0_30px_#DEFF9A80] hover:scale-105 transition-all shrink-0"
+                   >
+                      <Send size={16} className="sm:hidden" fill="currentColor" />
+                       <Send size={22} className="hidden sm:block" fill="currentColor" />
+                   </button>
+                </div>
+             </div>
+           </>
+         ) : (
+           <div className="h-full flex flex-col items-center justify-center text-center p-20 space-y-6">
+              <div className="w-24 h-24 rounded-[2.5rem] bg-white/5 border border-white/10 flex items-center justify-center text-white/20">
+                 <MessageSquare size={48} />
+              </div>
+              <div>
+                 <h3 className="text-xl font-black text-white uppercase tracking-widest mb-2">Selecciona un Canal</h3>
+                 <p className="text-white/20 text-xs font-medium max-w-xs leading-relaxed">
+                   Conéctate con tu red de apoyo institucional o gestiona tus grupos académicos en tiempo real.
+                 </p>
+              </div>
+           </div>
+         )}
+      </div>
+
+      <AnimatePresence>
+        {showDossier && selectedChat && (
+          <UserHierarchyModal 
+            user={chatToUser(selectedChat)} 
+            onClose={() => setShowDossier(false)}
+            onUpdateRole={() => {}}
+            onToggleStatus={() => {}}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Broadcast Modal (Director Only) */}
+      <AnimatePresence>
+        {showBroadcastModal && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center bg-[#061a1a]/95 backdrop-blur-2xl p-8"
+            onClick={() => setShowBroadcastModal(false)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              className="max-w-xl w-full neo-glass border-white/20 rounded-[3rem] p-10 overflow-hidden relative shadow-[0_0_100px_rgba(222,255,154,0.1)]"
+              onClick={e => e.stopPropagation()}
+            >
+               <div className="flex items-center gap-4 mb-8">
+                  <div className="w-14 h-14 rounded-2xl bg-orange-500/20 flex items-center justify-center text-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.2)]">
+                     <Volume2 size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic">Broadcast Global</h3>
+                    <p className="text-orange-500 text-[10px] font-black uppercase tracking-widest">Mensaje de Máxima Difusión Institucional</p>
+                  </div>
+               </div>
+
+               <div className="space-y-6">
+                  <div className="p-6 rounded-[2rem] bg-orange-500/5 border border-orange-500/20">
+                     <textarea 
+                        value={broadcastText}
+                        onChange={(e) => setBroadcastText(e.target.value)}
+                        placeholder="Redacta el anuncio para toda la comunidad..."
+                        className="w-full bg-transparent text-white text-sm font-bold h-40 outline-none resize-none placeholder:text-white/10"
+                     />
+                  </div>
+
+                  <div className="flex items-center gap-2 p-4 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400">
+                     <Info size={16} />
+                     <p className="text-[9px] font-black uppercase tracking-widest">Este mensaje será anclado en todos los dispositivos de la comunidad.</p>
+                  </div>
+
+                  <div className="flex gap-4">
+                     <button 
+                      onClick={() => setShowBroadcastModal(false)}
+                      className="flex-1 py-4 rounded-2xl border border-white/10 text-white/40 text-[10px] font-black uppercase tracking-widest hover:text-white transition-all"
+                     >
+                        Cancelar
+                     </button>
+                     <button 
+                      onClick={handleBroadcast}
+                      className="flex-[2] py-4 rounded-2xl bg-orange-500 text-white text-[10px] font-black uppercase tracking-widest shadow-[0_0_30px_rgba(249,115,22,0.3)] hover:scale-[1.02] transition-all"
+                     >
+                        Lanzar Difusión Global
+                     </button>
+                  </div>
+               </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}

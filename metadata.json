@@ -1,0 +1,6 @@
+{
+  "name": "TECLINGO PRO 1.1",
+  "description": "Premium English Language learning ecosystem powered by AI, featuring real-time pronunciation analysis and gamified milestones.",
+  "requestFramePermissions": ["microphone", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GROQ_API"]
+}
