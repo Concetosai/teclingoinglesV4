@@ -8,6 +8,7 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import Groq from "groq-sdk";
 import dotenv from "dotenv";
+import { getAudioUrl } from "google-tts-api";
 import { GRAMMAR_LIBRARY } from "./src/components/tools/grammarLibraryData";
 
 dotenv.config();
@@ -325,50 +326,24 @@ app.post("/api/grammar/verify", async (req, res) => {
   }
 });
 
-// ElevenLabs Neural TTS Proxy (voces hiperrealistas HD)
-// Usa la API key de TTS_API_KEY en .env.local
+// Google TTS gratuito — sin API key, sin config, funciona en Vercel
 app.post("/api/tts", async (req, res) => {
   const { text, gender } = req.body;
   if (!text) return res.status(400).json({ error: "Text is required" });
 
-  const apiKey = process.env.TTS_API_KEY;
-  if (!apiKey) {
-    console.warn("[TTS] TTS_API_KEY no configurada — usando fallback offline");
-    // Fallback: genera un audio mudo indicando que no hay voz premium disponible
-    return res.status(503).json({ error: "TTS_API_KEY not configured" });
-  }
-
-  // Voces premium ElevenLabs: Rachel (femenino) y Thomas (masculino)
-  const VOICE_IDS: Record<string, string> = {
-    female: "21m00Tcm4TlvDq8ikWAM", // Rachel — voz clara, profesional, nativa
-    male: "yoZ06aMxZJJ28mfd3POQ",   // Thomas — voz profunda, articulada
-  };
-  const voiceId = gender === 'male' ? VOICE_IDS.male : VOICE_IDS.female;
-
   try {
-    const response = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
-      {
-        method: "POST",
-        headers: {
-          "Accept": "audio/mpeg",
-          "Content-Type": "application/json",
-          "xi-api-key": apiKey,
-        },
-        body: JSON.stringify({
-          text,
-          model_id: "eleven_monolingual_v1",
-          voice_settings: {
-            stability: 0.3,
-            similarity_boost: 0.75,
-          },
-        }),
-      }
-    );
+    const url = getAudioUrl(text, {
+      lang: "en",
+      slow: false,
+      host: "https://translate.google.com",
+    });
 
+    const response = await fetch(url, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+    });
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("[TTS] ElevenLabs error:", response.status, errText);
+      const errText = await response.text().catch(() => "");
+      console.error("[TTS] Google TTS error:", response.status, errText.slice(0, 200));
       return res.status(502).json({ error: "TTS upstream failed" });
     }
 
@@ -376,8 +351,8 @@ app.post("/api/tts", async (req, res) => {
     res.set("Content-Type", "audio/mpeg");
     res.send(audioBuffer);
   } catch (error) {
-    console.error("[TTS] Proxy error:", error);
-    res.status(500).json({ error: "TTS proxy failed" });
+    console.error("[TTS] Google TTS error:", error);
+    res.status(500).json({ error: "TTS failed" });
   }
 });
 
