@@ -43,6 +43,24 @@ const getVelocityIndex = (vel: string) => {
   return 3; // '1.00' or '1.0'
 };
 
+const TOPIC_EN: Record<string, string> = {
+  'Viajes': 'Travel', 'Videojuegos': 'Video Games', 'Comida': 'Food', 'Deportes': 'Sports',
+  'Música': 'Music', 'Películas/Series': 'Movies/Series', 'Cocina': 'Cooking',
+};
+const topicToEnglish = (s: string) => TOPIC_EN[s] || s;
+
+const translateText = async (text: string, targetLang = 'es'): Promise<string> => {
+  try {
+    const res = await fetch(
+      `https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`
+    );
+    const data = await res.json();
+    return data[0]?.map((seg: any[]) => seg[0]).join('') || text;
+  } catch {
+    return text;
+  }
+};
+
 const SAFEZONE_SYSTEM_PROMPT = `You are SafePal, an elite, highly adaptive, and incredibly engaging AI English Tutor for Spanish speakers. Your mission is to hold a natural, exciting, and supportive conversation.
 
 STRICT RULES FOR YOUR PERSONALITY & STYLE:
@@ -65,9 +83,9 @@ export function SafeZoneModule() {
     const saved = localStorage.getItem('safezone_onboarding_data');
     const parsed = saved ? JSON.parse(saved) : {};
     return {
-      actividad_preferida: parsed.actividad_preferida || 'Comida',
+      actividad_preferida: topicToEnglish(parsed.actividad_preferida) || 'Food',
       red_social: parsed.red_social || 'TikTok',
-      entretenimiento: parsed.entretenimiento || 'Películas/Series',
+      entretenimiento: topicToEnglish(parsed.entretenimiento) || 'Movies/Series',
       companion_type: parsed.companion_type || 'friend',
       companion_gender: parsed.companion_gender || 'female'
     };
@@ -98,8 +116,8 @@ export function SafeZoneModule() {
     if (saved) return JSON.parse(saved);
     const savedOnboarding = localStorage.getItem('safezone_onboarding_data');
     const data = savedOnboarding ? JSON.parse(savedOnboarding) : {};
-    const hobby = data.actividad_preferida || 'Comida';
-    const channel = data.entretenimiento || 'Películas/Series';
+    const hobby = topicToEnglish(data.actividad_preferida || 'Food');
+    const channel = topicToEnglish(data.entretenimiento || 'Movies/Series');
     return [{
       id: 'welcome',
       sender: 'ai',
@@ -120,6 +138,11 @@ export function SafeZoneModule() {
       const welcomeMsg = messages.find(m => m.id === 'welcome');
       if (welcomeMsg) {
         handleSpeakText(welcomeMsg.text, welcomeMsg.id);
+        if (!welcomeMsg.translation) {
+          translateText(welcomeMsg.text, 'es').then(t => {
+            setMessages(prev => prev.map(m => m.id === 'welcome' ? { ...m, translation: t } : m));
+          });
+        }
       }
     }
   }, [isOnboarded]);
@@ -363,9 +386,9 @@ export function SafeZoneModule() {
   };
 
   // Onboarding Question Choices
-  const weekendActivities = ['Viajes', 'Videojuegos', 'Comida', 'Deportes'];
+  const weekendActivities = ['Travel', 'Video Games', 'Food', 'Sports'];
   const socialNetworks = ['TikTok', 'Instagram', 'YouTube', 'X/Reddit'];
-  const entertainmentTypes = ['Música', 'Películas/Series', 'Podcast Geek', 'Cocina'];
+  const entertainmentTypes = ['Music', 'Movies/Series', 'Podcast Geek', 'Cooking'];
 
   const handleFinishOnboarding = () => {
     setOnboardingStep(4);
@@ -420,9 +443,9 @@ export function SafeZoneModule() {
     // Intentar con Groq real via backend
     try {
       const systemPrompt = SAFEZONE_SYSTEM_PROMPT
-        .replace('{actividad_preferida}', onboarding.actividad_preferida)
+        .replace('{actividad_preferida}', topicToEnglish(onboarding.actividad_preferida))
         .replace('{red_social}', onboarding.red_social)
-        .replace('{entretenimiento}', onboarding.entretenimiento)
+        .replace('{entretenimiento}', topicToEnglish(onboarding.entretenimiento))
         .replace('{companion_type}', onboarding.companion_type || 'friend');
 
       const history = messages.map(m => ({
@@ -455,8 +478,9 @@ export function SafeZoneModule() {
       const content = data.content || '';
 
       if (content) {
+        const msgId = (Date.now() + 1).toString();
         const aiMsg: ChatMessage = {
-          id: (Date.now() + 1).toString(),
+          id: msgId,
           sender: 'ai',
           text: content,
           translation: '',
@@ -464,8 +488,11 @@ export function SafeZoneModule() {
         };
         setMessages(prev => [...prev, aiMsg]);
         setIsTyping(false);
-        // Autoreproducción inmediata de la respuesta IA
-        handleSpeakText(content, aiMsg.id);
+        handleSpeakText(content, msgId);
+        // Fetch Spanish translation in background
+        translateText(content, 'es').then(translation => {
+          setMessages(prev => prev.map(m => m.id === msgId ? { ...m, translation } : m));
+        });
         return;
       }
     } catch {
