@@ -178,120 +178,75 @@ export function SafeZoneModule() {
   // Use a ref to feed the up-to-date handleSendMessage down to transcription event listener
   const handleSendMessageRef = useRef<any>(null);
 
-  useEffect(() => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (SpeechRecognition) {
-      try {
-        const rec = new SpeechRecognition();
-        rec.continuous = false;
-        rec.interimResults = false;
-        rec.lang = 'en-US';
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-        rec.onstart = () => {
-          setIsRecording(true);
-          setRecognitionError(null);
-        };
-
-        rec.onresult = (event: any) => {
-          const transcript = event.results[0][0].transcript;
-          if (transcript && transcript.trim() && handleSendMessageRef.current) {
-            handleSendMessageRef.current(transcript);
-          }
-        };
-
-        rec.onerror = (event: any) => {
-          console.warn("Speech Recognition error captured: ", event.error);
-          setRecognitionError(event.error);
-          setIsRecording(false);
-
-          // If it failed/aborted immediately (e.g. within 1.5 seconds of starting) or block permission,
-          // we activate the smart simulated fallback so the student is never left stuck.
-          const duration = Date.now() - recordingStartTimeRef.current;
-          const isImmediateAbort = event.error === 'aborted' && duration < 1500;
-          const isPermissionBlock = event.error === 'not-allowed';
-
-          if (isImmediateAbort || isPermissionBlock || event.error === 'no-speech' || event.error === 'audio-capture') {
-            console.log("SafeZone AI: Web Speech API error/abort detected. Activating elegant simulated transcription fallback...");
-            setIsRecording(true);
-            setTimeout(() => {
-              const simulatedPhrases = [
-                "I feel so happy to speak English without any pressure!",
-                "I would love to enjoy the delicious typical food with friends",
-                "This viral trend in my favorite social network looks quite interesting",
-                "I want to practice my pronunciation tools and speaking skills today in Greenfield"
-              ];
-              const randomPhrase = simulatedPhrases[Math.floor(Math.random() * simulatedPhrases.length)];
-              if (handleSendMessageRef.current) {
-                handleSendMessageRef.current(randomPhrase);
-              }
-              setIsRecording(false);
-            }, 1500);
-          }
-        };
-
-        rec.onend = () => {
-          setIsRecording(false);
-        };
-
-        recognitionRef.current = rec;
-      } catch (e) {
-        console.warn("SafeZoneModule: SpeechRecognition constructor failed or is illegal in this iframe sandbox:", e);
-      }
-    }
-  }, []);
-
-  const handleToggleRecord = () => {
-    if (isRecording) {
-      recordingStartTimeRef.current = 0; // Intentional stop
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.stop();
-        } catch (e) {
-          console.error(e);
-        }
-      } else {
+  const startSpeechRecognition = () => {
+    const SpeechRecognitionClass = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognitionClass) {
+      setRecognitionError('not-supported');
+      setIsRecording(true);
+      setTimeout(() => {
+        const fallback = ["I feel so happy to speak English without any pressure!","I would love to enjoy the delicious typical food with friends","This viral trend in my favorite social network looks quite interesting","I want to practice my pronunciation tools and speaking skills today in Greenfield"];
+        if (handleSendMessageRef.current) handleSendMessageRef.current(fallback[Math.floor(Math.random() * fallback.length)]);
         setIsRecording(false);
-      }
-    } else {
-      if (recognitionRef.current) {
-        try {
-          recordingStartTimeRef.current = Date.now();
-          recognitionRef.current.start();
-        } catch (e) {
-          console.error(e);
-          // If start itself throws an exception immediately, fall back to simulation
+      }, 1500);
+      return;
+    }
+    try {
+      const rec = new SpeechRecognitionClass();
+      rec.continuous = isIOS; // iOS: debe ser true o no dispara results
+      rec.interimResults = false;
+      rec.lang = 'en-US';
+
+      rec.onstart = () => { setIsRecording(true); setRecognitionError(null); };
+
+      rec.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript && transcript.trim() && handleSendMessageRef.current)
+          handleSendMessageRef.current(transcript);
+      };
+
+      rec.onerror = (event: any) => {
+        console.warn("Speech Recognition error: ", event.error);
+        setRecognitionError(event.error);
+        setIsRecording(false);
+        recognitionRef.current = null;
+        const duration = Date.now() - recordingStartTimeRef.current;
+        if (event.error === 'aborted' && duration < 1500 || event.error === 'not-allowed' || event.error === 'no-speech' || event.error === 'audio-capture') {
           setIsRecording(true);
           setTimeout(() => {
-            const simulatedPhrases = [
-              "I feel so happy to speak English without any pressure!",
-              "I would love to enjoy the delicious typical food with friends",
-              "This viral trend in my favorite social network looks quite interesting",
-              "I want to practice my pronunciation tools and speaking skills today in Greenfield"
-            ];
-            const randomPhrase = simulatedPhrases[Math.floor(Math.random() * simulatedPhrases.length)];
-            if (handleSendMessageRef.current) {
-              handleSendMessageRef.current(randomPhrase);
-            }
+            const fallback = ["I feel so happy to speak English without any pressure!","I would love to enjoy the delicious typical food with friends","This viral trend in my favorite social network looks quite interesting","I want to practice my pronunciation tools and speaking skills today in Greenfield"];
+            if (handleSendMessageRef.current) handleSendMessageRef.current(fallback[Math.floor(Math.random() * fallback.length)]);
             setIsRecording(false);
           }, 1500);
         }
-      } else {
-        // Fallback simulation text if Speech API not supported/active in sandboxed iframe environment
-        setIsRecording(true);
-        setTimeout(() => {
-          const simulatedPhrases = [
-            "I feel so happy to speak English without any pressure!",
-            "I would love to enjoy the delicious typical food with friends",
-            "This viral trend in my favorite social network looks quite interesting",
-            "I want to practice my pronunciation tools and speaking skills today in Greenfield"
-          ];
-          const randomPhrase = simulatedPhrases[Math.floor(Math.random() * simulatedPhrases.length)];
-          if (handleSendMessageRef.current) {
-            handleSendMessageRef.current(randomPhrase);
-          }
-          setIsRecording(false);
-        }, 1500);
-      }
+      };
+
+      rec.onend = () => { setIsRecording(false); recognitionRef.current = null; };
+
+      recordingStartTimeRef.current = Date.now();
+      rec.start();
+      recognitionRef.current = rec;
+    } catch (e) {
+      console.warn("SafeZoneModule: SpeechRecognition constructor failed:", e);
+      setRecognitionError('not-supported');
+      setIsRecording(true);
+      setTimeout(() => {
+        const fallback = ["I feel so happy to speak English without any pressure!","I would love to enjoy the delicious typical food with friends","This viral trend in my favorite social network looks quite interesting","I want to practice my pronunciation tools and speaking skills today in Greenfield"];
+        if (handleSendMessageRef.current) handleSendMessageRef.current(fallback[Math.floor(Math.random() * fallback.length)]);
+        setIsRecording(false);
+      }, 1500);
+    }
+  };
+
+  const handleToggleRecord = () => {
+    if (isRecording) {
+      recordingStartTimeRef.current = 0;
+      try { recognitionRef.current?.stop(); } catch { /* ignore */ }
+      setIsRecording(false);
+    } else {
+      startSpeechRecognition();
     }
   };
 
